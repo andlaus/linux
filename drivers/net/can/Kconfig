@@ -179,6 +179,22 @@ config CAN_LIN
 
 	  Actual device drivers need to be enabled too.
 
+config CAN_LIN_SERDEV
+	tristate "Serial LIN Adaptors"
+	depends on CAN_LIN && SERIAL_DEV_BUS && OF
+	help
+	  LIN-Bus support for UART devices equipped with LIN transceievers.
+	  This device driver is using CAN_LIN for a userland connection on
+	  one side and the kernel its serial device bus (serdev) interface
+	  on the other side.
+
+	  If you have a hexlin tty adapter, say Y here and see
+	  <https://hexdev.de/hexlin#tty>.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called lin-serdev.ko.
+
+
 config CAN_SLCAN
 	tristate "Serial / USB serial CAN Adaptors (slcan)"
 	depends on TTY
