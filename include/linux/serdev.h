@@ -23,11 +23,17 @@ struct serdev_device;
  * struct serdev_device_ops - Callback operations for a serdev device
  * @receive_buf:	Function called with data received from device;
  *			returns number of bytes accepted; may sleep.
+ * @receive_buf_fp:	Function called with data and flag buffer received
+ *			from device; If defined, this function gets called
+ *			instead of @receive_buf;
+ *			returns number of bytes accepted; may sleep.
  * @write_wakeup:	Function called when ready to transmit more data; must
  *			not sleep.
  */
 struct serdev_device_ops {
 	ssize_t (*receive_buf)(struct serdev_device *, const u8 *, size_t);
+	ssize_t (*receive_buf_fp)(struct serdev_device *, const u8 *,
+				  const u8 *, size_t);
 	void (*write_wakeup)(struct serdev_device *);
 };
 
@@ -186,15 +192,20 @@ static inline void serdev_controller_write_wakeup(struct serdev_controller *ctrl
 }
 
 static inline ssize_t serdev_controller_receive_buf(struct serdev_controller *ctrl,
-						    const u8 *data,
+						    const u8 *data, const u8 *fp,
 						    size_t count)
 {
 	struct serdev_device *serdev = ctrl->serdev;
 
-	if (!serdev || !serdev->ops->receive_buf)
+	if (!serdev || !serdev->ops)
 		return 0;
 
-	return serdev->ops->receive_buf(serdev, data, count);
+	if (serdev->ops->receive_buf_fp)
+		return serdev->ops->receive_buf_fp(serdev, data, fp, count);
+	else if (serdev->ops->receive_buf)
+		return serdev->ops->receive_buf(serdev, data, count);
+
+	return 0;
 }
 
 #if IS_ENABLED(CONFIG_SERIAL_DEV_BUS)

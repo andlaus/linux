@@ -32,7 +32,7 @@ static size_t ttyport_receive_buf(struct tty_port *port, const u8 *cp,
 	if (!test_bit(SERPORT_ACTIVE, &serport->flags))
 		return 0;
 
-	ret = serdev_controller_receive_buf(ctrl, cp, count);
+	ret = serdev_controller_receive_buf(ctrl, cp, fp, count);
 
 	dev_WARN_ONCE(&ctrl->dev, ret < 0 || ret > count,
 				"receive_buf returns %d (count = %zu)\n",
