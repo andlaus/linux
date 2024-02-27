@@ -194,6 +194,22 @@ static void ttyport_set_flow_control(struct serdev_controller *ctrl, bool enable
 	tty_set_termios(tty, &ktermios);
 }
 
+static void ttyport_set_break_detection(struct serdev_controller *ctrl, bool enable)
+{
+	struct serport *serport = serdev_controller_get_drvdata(ctrl);
+	struct tty_struct *tty = serport->tty;
+	struct ktermios ktermios = tty->termios;
+
+	ktermios.c_iflag &= ~(IGNBRK | BRKINT);
+
+	if (enable)
+		ktermios.c_iflag |= BRKINT;
+	else
+		ktermios.c_iflag |= IGNBRK;
+
+	tty_set_termios(tty, &ktermios);
+}
+
 static int ttyport_set_parity(struct serdev_controller *ctrl,
 			      enum serdev_parity parity)
 {
@@ -265,6 +281,7 @@ static const struct serdev_controller_ops ctrl_ops = {
 	.open = ttyport_open,
 	.close = ttyport_close,
 	.set_flow_control = ttyport_set_flow_control,
+	.set_break_detection = ttyport_set_break_detection,
 	.set_parity = ttyport_set_parity,
 	.set_baudrate = ttyport_set_baudrate,
 	.wait_until_sent = ttyport_wait_until_sent,
