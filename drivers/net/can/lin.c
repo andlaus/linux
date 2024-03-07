@@ -132,6 +132,27 @@ static ssize_t lin_responder_cfg_store(struct device *dev,
 
 static DEVICE_ATTR_RW(lin_responder_cfg);
 
+static int lin_setup_rxoffload(struct lin_device *ldev,
+			       struct canfd_frame *cfd)
+{
+	struct lin_responder_answer answ;
+
+	if (!(cfd->flags & CANFD_FDF))
+		return -EMSGSIZE;
+
+	BUILD_BUG_ON(sizeof(struct lin_responder_answer) > sizeof(cfd->data));
+	memcpy(&answ, cfd->data, sizeof(struct lin_responder_answer));
+
+	answ.lf.checksum_mode = (cfd->can_id & LIN_ENHANCED_CKSUM_FLAG) ?
+			LINBUS_ENHANCED : LINBUS_CLASSIC;
+
+	if (answ.lf.lin_id > LIN_ID_MASK ||
+	    answ.event_associated_id > LIN_ID_MASK)
+		return -EINVAL;
+
+	return ldev->ldev_ops->update_responder_answer(ldev, &answ);
+}
+
 static void lin_tx_work_handler(struct work_struct *ws)
 {
 	struct lin_device *ldev = container_of(ws, struct lin_device,
@@ -139,10 +160,19 @@ static void lin_tx_work_handler(struct work_struct *ws)
 	struct net_device *ndev = ldev->ndev;
 	struct canfd_frame *cfd;
 	struct lin_frame lf;
+	int ret;
 
 	ldev->tx_busy = true;
 
 	cfd = (struct canfd_frame *)ldev->tx_skb->data;
+
+	if (cfd->can_id & LIN_RXOFFLOAD_DATA_FLAG) {
+		ret = lin_setup_rxoffload(ldev, cfd);
+		if (ret < 0)
+			netdev_err(ndev, "setting up rx failed %d\n", ret);
+		goto lin_tx_out;
+	}
+
 	lf.checksum_mode = (cfd->can_id & LIN_ENHANCED_CKSUM_FLAG) ?
 			   LINBUS_ENHANCED : LINBUS_CLASSIC;
 	lf.lin_id = (u8)(cfd->can_id & LIN_ID_MASK);
@@ -158,6 +188,8 @@ static void lin_tx_work_handler(struct work_struct *ws)
 
 	DEV_STATS_INC(ndev, tx_packets);
 	DEV_STATS_ADD(ndev, tx_bytes, lf.len);
+
+lin_tx_out:
 	ldev->tx_busy = false;
 	netif_wake_queue(ndev);
 }
