@@ -86,7 +86,9 @@ enum {
 	TX_EXPIRED,	/* notification on performed transmissions (count=0) */
 	RX_STATUS,	/* reply to RX_READ request */
 	RX_TIMEOUT,	/* cyclic message is absent */
-	RX_CHANGED	/* updated CAN frame (detected content change) */
+	RX_CHANGED,	/* updated CAN frame (detected content change) */
+	RX_LIN_SETUP,	/* create auto-response for LIN frame */
+	RX_LIN_DELETE,  /* remove auto-response for LIN frame */
 };
 
 #define SETTIMER            0x0001
@@ -101,5 +103,6 @@ enum {
 #define TX_RESET_MULTI_IDX  0x0200
 #define RX_RTR_FRAME        0x0400
 #define CAN_FD_FRAME        0x0800
+#define LIN_EVENT_FRAME     0x1000
 
 #endif /* !_UAPI_CAN_BCM_H */

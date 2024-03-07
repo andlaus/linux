@@ -59,6 +59,7 @@
 #include <linux/can/bcm.h>
 #include <linux/slab.h>
 #include <net/sock.h>
+#include <net/lin.h>
 #include <net/net_namespace.h>
 
 /*
@@ -1288,6 +1289,59 @@ static int bcm_tx_send(struct msghdr *msg, int ifindex, struct sock *sk,
 	return cfsiz + MHSIZ;
 }
 
+static int bcm_lin_setup(struct bcm_msg_head *msg_head, struct msghdr *msg,
+			 int ifindex, struct sock *sk, int cfsiz, int is_active)
+{
+	struct lin_responder_answer answ;
+	struct net_device *dev;
+	struct sk_buff *skb;
+	struct canfd_frame cf;
+	netdevice_tracker tracker;
+	size_t sz;
+	int ret;
+
+	if (msg_head->nframes > 1)
+		return -EINVAL;
+
+	if (!(msg_head->flags & CAN_FD_FRAME))
+		return -EINVAL;
+
+	ret = memcpy_from_msg(&cf, msg, cfsiz);
+	if (ret < 0)
+		return ret;
+
+	answ.lf.lin_id = cf.can_id & LIN_ID_MASK;
+	answ.is_active = is_active;
+	answ.is_event_frame = !!(msg_head->flags & LIN_EVENT_FRAME);
+	answ.event_associated_id = msg_head->can_id;
+	answ.lf.len = min(cf.len, LIN_MAX_DLEN);
+	memcpy(answ.lf.data, cf.data, answ.lf.len);
+	sz = min(sizeof(struct lin_responder_answer), sizeof(cf.data));
+	cf.can_id |= LIN_RXOFFLOAD_DATA_FLAG;
+	memcpy(cf.data, &answ, sz);
+
+	dev = netdev_get_by_index(sock_net(sk), ifindex, &tracker, GFP_KERNEL);
+	if (!dev)
+		return -ENODEV;
+
+	skb = alloc_skb(cfsiz + sizeof(struct can_skb_priv), gfp_any());
+	if (!skb)
+		goto lin_out;
+
+	can_skb_reserve(skb);
+	can_skb_prv(skb)->ifindex = dev->ifindex;
+	can_skb_prv(skb)->skbcnt = 0;
+	skb_put_data(skb, &cf, cfsiz);
+
+	skb->dev = dev;
+	can_skb_set_owner(skb, sk);
+	ret = can_send(skb, 1); /* send with loopback */
+
+lin_out:
+	netdev_put(dev, &tracker);
+	return ret;
+}
+
 /*
  * bcm_sendmsg - process BCM commands (opcodes) from the userspace
  */
@@ -1387,10 +1441,28 @@ static int bcm_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 
 	case TX_SEND:
 		/* we need exactly one CAN frame behind the msg head */
-		if ((msg_head.nframes != 1) || (size != cfsiz + MHSIZ))
+		if (msg_head.nframes != 1 || size != cfsiz + MHSIZ)
 			ret = -EINVAL;
 		else
 			ret = bcm_tx_send(msg, ifindex, sk, cfsiz);
+		break;
+
+	case RX_LIN_SETUP:
+		/* we need exactly one CAN frame behind the msg head */
+		if (msg_head.nframes != 1 || size != cfsiz + MHSIZ)
+			ret = -EINVAL;
+		else
+			ret = bcm_lin_setup(&msg_head, msg, ifindex, sk, cfsiz,
+					    1);
+		break;
+
+	case RX_LIN_DELETE:
+		/* we need exactly one CAN frame behind the msg head */
+		if (msg_head.nframes != 1 || size != cfsiz + MHSIZ)
+			ret = -EINVAL;
+		else
+			ret = bcm_lin_setup(&msg_head, msg, ifindex, sk, cfsiz,
+					    0);
 		break;
 
 	default:
