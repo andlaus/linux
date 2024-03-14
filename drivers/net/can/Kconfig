@@ -169,6 +169,16 @@ config CAN_KVASER_PCIEFD
 	    Kvaser Mini PCI Express 1xCAN v3
 	    Kvaser Mini PCI Express 2xCAN v3
 
+config CAN_LIN
+	tristate "LIN mode support"
+	help
+	  This is a glue driver for LIN-BUS support.
+
+	  The local interconnect (LIN) bus is a simple bus with a feature
+	  subset of CAN. It is often combined with CAN for simple controls.
+
+	  Actual device drivers need to be enabled too.
+
 config CAN_SLCAN
 	tristate "Serial / USB serial CAN Adaptors (slcan)"
 	depends on TTY
