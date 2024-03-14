@@ -496,6 +496,25 @@ config HID_GYRATION
 	help
 	Support for Gyration remote control.
 
+config HID_HEXLIN
+	tristate "hexLIN LIN Bus adapter"
+	depends on HID
+	select CAN_LIN
+	help
+	  Support for hexLIN USB LIN-BUS Adapter.
+
+	  Local Interconnect Network (LIN) to USB adapter for controller and
+	  responder usage.
+	  This device driver is using CAN_LIN for a userland connection on
+	  one side and USB HID for the actual hardware adapter on the other
+	  side.
+
+	  If you have such an adapter, say Y here and see
+	  <https://hexdev.de/hexlin>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hid-hexlin.
+
 config HID_ICADE
 	tristate "ION iCade arcade controller"
 	help
