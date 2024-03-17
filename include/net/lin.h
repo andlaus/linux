@@ -18,6 +18,7 @@
 
 #define LIN_ID_MASK		0x0000003FU
 /* special ID descriptions for LIN */
+#define LIN_RXOFFLOAD_DATA_FLAG	0x00000200U
 #define LIN_ENHANCED_CKSUM_FLAG	0x00000100U
 
 static const unsigned char lin_id_parity_tbl[] = {
