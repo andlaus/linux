@@ -171,6 +171,8 @@ HEXLIN_GET_CMD(get_baudrate, HEXLIN_GET_BAUDRATE)
 	}
 
 HEXLIN_VAL_CMD(send_break, HEXLIN_SEND_BREAK, hexlin_val8_req, u8)
+HEXLIN_VAL_CMD(set_mode_controller, HEXLIN_SET_MODE_CONTROLLER, hexlin_val8_req,
+	       bool)
 
 static int hexlin_queue_frames_insert(struct hexlin_priv_data *priv,
 				      const u8 *raw_data, int sz)
@@ -312,6 +314,14 @@ static int hexlin_ldo_tx(struct lin_device *ldev,
 	return ret;
 }
 
+static int  hexlin_update_lin_mode(struct lin_device *ldev, enum lin_mode lm)
+{
+	struct hid_device *hdev = to_hid_device(ldev->dev);
+	struct hexlin_priv_data *priv = hid_get_drvdata(hdev);
+
+	return hexlin_set_mode_controller(priv, lm == LINBUS_COMMANDER);
+}
+
 static int hexlin_update_bitrate(struct lin_device *ldev, u16 bitrate)
 {
 	struct hid_device *hdev = to_hid_device(ldev->dev);
@@ -377,6 +387,7 @@ static int hexlin_update_resp_answer(struct lin_device *ldev,
 
 static const struct lin_device_ops hexlin_ldo = {
 	.ldo_tx = hexlin_ldo_tx,
+	.update_lin_mode = hexlin_update_lin_mode,
 	.update_bitrate = hexlin_update_bitrate,
 	.get_responder_answer = hexlin_get_responder_answer,
 	.update_responder_answer = hexlin_update_resp_answer,
