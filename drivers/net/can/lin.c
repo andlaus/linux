@@ -209,10 +209,39 @@ static netdev_tx_t lin_start_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 }
 
+static int lin_update_mode(struct net_device *ndev)
+{
+	struct lin_device *ldev = netdev_priv(ndev);
+	u32 ctrlmode = ldev->can.ctrlmode;
+	enum lin_mode lm;
+	int ret = 0;
+
+	lm = (ctrlmode & CAN_CTRLMODE_LIN_COMMANDER) ? LINBUS_COMMANDER :
+						       LINBUS_RESPONDER;
+	if (ldev->lmode != lm) {
+		if (!ldev->ldev_ops->update_lin_mode) {
+			netdev_err(ndev, "setting lin mode unsupported\n");
+			return -EINVAL;
+		}
+		ret = ldev->ldev_ops->update_lin_mode(ldev, lm);
+		if (ret) {
+			netdev_err(ndev, "Failed to set lin mode: %d\n", ret);
+			return ret;
+		}
+		ldev->lmode = lm;
+	}
+
+	return ret;
+}
+
 static int lin_open(struct net_device *ndev)
 {
 	struct lin_device *ldev = netdev_priv(ndev);
 	int ret;
+
+	ret = lin_update_mode(ndev);
+	if (ret)
+		return ret;
 
 	ldev->tx_busy = false;
 
@@ -388,7 +417,7 @@ struct lin_device *register_lin(struct device *dev,
 	ndev->mtu = CANFD_MTU;
 	ldev->can.bittiming.bitrate = LIN_DEFAULT_BAUDRATE;
 	ldev->can.ctrlmode = CAN_CTRLMODE_LIN;
-	ldev->can.ctrlmode_supported = 0;
+	ldev->can.ctrlmode_supported = CAN_CTRLMODE_LIN_COMMANDER;
 	ldev->can.bitrate_const = lin_bitrate;
 	ldev->can.bitrate_const_cnt = ARRAY_SIZE(lin_bitrate);
 	ldev->can.do_set_bittiming = lin_set_bittiming;
@@ -401,6 +430,15 @@ struct lin_device *register_lin(struct device *dev,
 	if (ret) {
 		netdev_err(ndev, "set bittiming failed\n");
 		goto exit_candev;
+	}
+
+	ldev->lmode = LINBUS_RESPONDER;
+	if (ldev->ldev_ops->update_lin_mode) {
+		ret = ldev->ldev_ops->update_lin_mode(ldev, ldev->lmode);
+		if (ret) {
+			netdev_err(ndev, "updating lin mode failed\n");
+			goto exit_candev;
+		}
 	}
 
 	ret = register_candev(ndev);

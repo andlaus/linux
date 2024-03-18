@@ -39,6 +39,11 @@ static const unsigned char lin_id_parity_tbl[] = {
 #define LIN_CHECK_PID(PID)	(LIN_GET_PARITY(PID) == \
 					LIN_GET_PARITY(LIN_FORM_PID(PID)))
 
+enum lin_mode {
+	LINBUS_RESPONDER = 0,
+	LINBUS_COMMANDER,
+};
+
 struct lin_device {
 	struct can_priv can;  /* must be the first member */
 	struct net_device *ndev;
@@ -48,6 +53,7 @@ struct lin_device {
 	struct work_struct tx_work;
 	bool tx_busy;
 	struct sk_buff *tx_skb;
+	enum lin_mode lmode;
 };
 
 enum lin_checksum_mode {
@@ -72,6 +78,7 @@ struct lin_responder_answer {
 
 struct lin_device_ops {
 	int (*ldo_tx)(struct lin_device *ldev, const struct lin_frame *frame);
+	int (*update_lin_mode)(struct lin_device *ldev, enum lin_mode lm);
 	int (*update_bitrate)(struct lin_device *ldev, u16 bitrate);
 	int (*update_responder_answer)(struct lin_device *ldev,
 				       const struct lin_responder_answer *answ);
